@@ -1,22 +1,19 @@
+// Wifi credentials
 #include <credentials.h>
+
+// Metro library for timed events
+#include <Metro.h>
+Metro publishTimer = Metro(300);
+
+// DFPlayer
 #include <SoftwareSerial.h>
 #include <DFPlayer_Mini_Mp3.h>
 SoftwareSerial mySerial(D3, D4); // RX, TX
-
-#include <Metro.h>
 
 // esphelper
 #include "ESPHelper.h"
 #include <strings.h>
 #include <time.h>
-#define NETWORK_HOSTNAME "Owl"
-
-char* hostnameStr = NETWORK_HOSTNAME;
-char* owlMp3Topic = "owl/mp3";
-
-int randInt = 0;
-int prevRandInt = 0;
-
 netInfo homeNet = {  
           .mqttHost = "192.168.1.76",      //can be blank if not using MQTT
           .mqttUser = "",   //can be blank
@@ -27,33 +24,17 @@ netInfo homeNet = {
           };
 ESPHelper myESP(&homeNet);
 
+int randInt = 0;
+int prevRandInt = 0;
 int fadeAmount = 5;
 int brightness = 0;
 int eyes;
 int owlState = false;
 bool radarStatus = false;
 bool mqttActive= false;
-String currentPlayer;
-
-
-Metro publishTimer = Metro(300);
-
-void blink(int repeat){
-  for(int i=0; i<repeat; i++){
-    digitalWrite(D1, HIGH);
-    digitalWrite(D2, HIGH);     
-    delay(100);
-    digitalWrite(D1, LOW);
-    digitalWrite(D2, LOW);
-    delay(900);
-  }
-}
-
-
-
-
-
-
+char* owlMp3Topic = "owl/mp3";
+// this is the list of mp3 files corresponding to each player
+// (the actual filenames are 0020.mp3 ... 0031.mp3)
 char *players[]={
 "20", 
 "21", 
@@ -69,9 +50,9 @@ char *players[]={
 "31"
 };
 int playNum = sizeof(players);
-
-
 long player;
+String currentPlayer;
+
 
 
 void setup() {
@@ -131,7 +112,7 @@ void loop() {
   }
 
 
-  // reset owl when timer has expired
+  // reset the owl when timer has expired
   if(publishTimer.check()){
     owlState = false;
 
@@ -157,8 +138,19 @@ void loop() {
   delay(3);
 }
 
+// Blink Eyes
+void blink(int repeat){
+  for(int i=0; i<repeat; i++){
+    digitalWrite(D1, HIGH);
+    digitalWrite(D2, HIGH);     
+    delay(100);
+    digitalWrite(D1, LOW);
+    digitalWrite(D2, LOW);
+    delay(900);
+  }
+}
 
-
+// get a pretty random seed (based on https://www.instructables.com/id/Arduino-Random-Name-Generator/ )
 unsigned int bitOut(void) {
   static unsigned long firstTime=1, prev=0;
   unsigned long bit1=0, bit0=0, x=0, port=0, limit=10;
@@ -186,6 +178,7 @@ unsigned long seedOut(unsigned int noOfBits) {
   return seed;
 }
 
+// the callback function for incoming MQTT traffic
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String payloadStr = String((char *)payload).substring(0,length);
   Serial.print("mqtt: ");
@@ -204,6 +197,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         break;
       case 99:
         {
+          // here we pick a random player,
+          // check if they have been picked before.
+          // if so we repeat, otherwise we play that player's audio file.
           Serial.println("random number");
           bool unique = false;
           do{
